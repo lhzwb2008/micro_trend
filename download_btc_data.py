@@ -20,15 +20,15 @@ import argparse
 # 您可以在这里修改下载的时间范围
 CONFIG = {
     # 数据下载时间范围配置
-    'START_DATE': '2024-01-01',  # 开始日期，格式：YYYY-MM-DD
-    'END_DATE': '2025-05-31',    # 结束日期，格式：YYYY-MM-DD
+    'START_DATE': '2020-01-01',  # 开始日期，格式：YYYY-MM-DD（近5年）
+    'END_DATE': '2025-11-10',    # 结束日期，格式：YYYY-MM-DD（到最新）
     
     # 输出文件配置
-    'OUTPUT_FILENAME': 'btc_1m.csv',  # 输出文件名（直接在当前目录）
+    'OUTPUT_FILENAME': 'btc_15m.csv',  # 输出文件名（直接在当前目录）
     
     # 下载配置
     'SYMBOL': 'BTCUSDT',              # 交易对
-    'INTERVAL': '1m',                 # 时间间隔
+    'INTERVAL': '15m',                # 时间间隔（15分钟）
     'DELAY_BETWEEN_DOWNLOADS': 0.5,   # 下载间隔（秒）
 }
 # ================================================
