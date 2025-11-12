@@ -24,29 +24,29 @@ warnings.filterwarnings('ignore')
 # ==================== 策略配置 ====================
 
 CONFIG = {
-    # 数据文件路径
-    'data_file': 'btc_15m.csv',
+    # 数据设置
+    'data_file': 'btc_15m.csv',    # 数据文件路径
+    'start_date': '2020-11-01',    # 回测起始日期（格式：YYYY-MM-DD，None表示从数据开始）
+    'end_date': '2025-11-09',      # 回测结束日期（格式：YYYY-MM-DD，None表示到数据结束）
     
     # VWAP计算周期（单位：K线数量，15分钟K线）
     'vwap_period': 96,  # 96个15分钟 = 24小时
     
-    # 偏离阈值（标准差倍数）
-    'entry_std_multiplier': 2.0,  # 进场阈值：价格偏离VWAP达到2倍标准差
+    # 偏离阈值设置（二选一）
+    'use_fixed_deviation': True,   # True=使用固定百分比，False=使用标准差倍数
+    'entry_deviation_pct': 0.1,   # 固定偏离百分比（2024-2025稳定期建议：0.05-0.07）
+    'entry_std_multiplier': 2.0,   # 标准差倍数（仅use_fixed_deviation=False时生效）
     
-    # 或者使用固定百分比偏离（如果设置，将覆盖标准差方法）
-    'use_fixed_deviation': False,  # 是否使用固定百分比偏离
-    'entry_deviation_pct': 0.03,   # 固定偏离百分比（3%）
-    
-    # 止盈止损
-    'take_profit_pct': 0.015,      # 止盈：1.5%
-    'stop_loss_pct': 0.02,         # 止损：2%
+    # 止盈止损（优化后的最佳参数）
+    'take_profit_pct': 0.04,       # 止盈：4%
+    'stop_loss_pct': 0.01,         # 止损：1%
     
     # 回归目标
     'exit_on_vwap_touch': True,    # 价格回归到VWAP时平仓
-    'vwap_touch_threshold': 0.002, # VWAP触碰阈值（0.2%以内视为回归）
+    'vwap_touch_threshold': 0.003, # VWAP触碰阈值（0.3%以内视为回归）
     
     # 时间控制
-    'max_hold_periods': 8,         # 最大持仓周期（8个15分钟 = 2小时）
+    'max_hold_periods': 14,        # 最大持仓周期（14个15分钟 = 3.5小时）
     'force_close_hour': 23,        # 强制平仓小时（UTC时间）
     'force_close_minute': 45,      # 强制平仓分钟
     
@@ -54,7 +54,7 @@ CONFIG = {
     'enable_long': True,           # 是否允许做多
     'enable_short': True,          # 是否允许做空
     
-    # 信号确认
+    # 成交量确认
     'require_volume_confirm': True,  # 是否需要成交量确认
     'volume_ma_period': 20,         # 成交量均线周期
     'volume_threshold': 1.0,        # 成交量阈值（当前成交量/均线）
@@ -65,62 +65,14 @@ CONFIG = {
     'slippage': 0.0005,            # 滑点（0.05%）
     
     # 输出控制
-    'print_trades': False,         # 是否打印每笔交易
+    'print_trades': True,          # 是否打印每笔交易
     'print_daily_summary': False,  # 是否打印每日统计
 }
 
-# ==================== 预设配置 ====================
-
-PRESETS = {
-    'balanced': {  # 平衡型：8%偏离，交易次数适中（推荐）⭐
-        'use_fixed_deviation': True,
-        'entry_deviation_pct': 0.08,  # 8%偏离才入场
-        'take_profit_pct': 0.03,
-        'stop_loss_pct': 0.015,
-        'max_hold_periods': 12,
-        'exit_on_vwap_touch': True,
-        'vwap_touch_threshold': 0.003,
-        'require_volume_confirm': True,
-    },
-    'high_return': {  # 高收益型：10%偏离，交易次数少但盈利因子高
-        'use_fixed_deviation': True,
-        'entry_deviation_pct': 0.10,  # 10%偏离才入场
-        'take_profit_pct': 0.035,
-        'stop_loss_pct': 0.02,
-        'max_hold_periods': 16,
-        'exit_on_vwap_touch': True,
-        'vwap_touch_threshold': 0.004,
-        'require_volume_confirm': True,
-    },
-    'moderate': {  # 适中型：7%偏离
-        'use_fixed_deviation': True,
-        'entry_deviation_pct': 0.07,
-        'take_profit_pct': 0.025,
-        'stop_loss_pct': 0.015,
-        'max_hold_periods': 12,
-        'exit_on_vwap_touch': True,
-        'vwap_touch_threshold': 0.003,
-        'require_volume_confirm': True,
-    },
-    'frequent': {  # 高频型：6%偏离，更多交易机会
-        'use_fixed_deviation': True,
-        'entry_deviation_pct': 0.06,
-        'take_profit_pct': 0.02,
-        'stop_loss_pct': 0.015,
-        'max_hold_periods': 10,
-        'exit_on_vwap_touch': True,
-        'vwap_touch_threshold': 0.003,
-        'require_volume_confirm': True,
-    },
-}
-
-# 选择预设（None表示使用CONFIG中的默认值）
-ACTIVE_PRESET = 'balanced'  # 可选: 'balanced'⭐, 'high_return', 'moderate', 'frequent'
-
 # ==================== 数据加载 ====================
 
-def load_data(file_path):
-    """加载BTC历史数据"""
+def load_data(file_path, start_date=None, end_date=None):
+    """加载BTC历史数据并按时间范围过滤"""
     print(f"正在加载数据: {file_path}")
     df = pd.read_csv(file_path)
     
@@ -133,6 +85,19 @@ def load_data(file_path):
     
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values('timestamp').reset_index(drop=True)
+    
+    # 按时间范围过滤
+    if start_date:
+        start_dt = pd.to_datetime(start_date)
+        df = df[df['timestamp'] >= start_dt]
+        print(f"过滤起始日期: {start_date}")
+    
+    if end_date:
+        end_dt = pd.to_datetime(end_date)
+        df = df[df['timestamp'] <= end_dt]
+        print(f"过滤结束日期: {end_date}")
+    
+    df = df.reset_index(drop=True)
     
     print(f"数据范围: {df['timestamp'].min()} 到 {df['timestamp'].max()}")
     print(f"数据点数: {len(df)}")
@@ -338,11 +303,8 @@ def run_backtest(df, config):
                 trades.append(trade_record)
                 
                 if config['print_trades']:
-                    print(f"[{exit_reason.upper()}] {trade_record['direction']} | "
-                          f"Entry: {entry_price:.2f} @ {entry_time.strftime('%Y-%m-%d %H:%M')} | "
-                          f"Exit: {exit_price:.2f} @ {current_time.strftime('%Y-%m-%d %H:%M')} | "
-                          f"PnL: {pnl:+.2f} ({trade_record['pnl_pct']:+.2f}%) | "
-                          f"Hold: {hold_periods}期 | Capital: {capital:.2f}")
+                    print(f"{trade_record['direction']:<5} | {entry_time.strftime('%Y-%m-%d %H:%M')} → {current_time.strftime('%Y-%m-%d %H:%M')} | "
+                          f"PnL: ${pnl:+8.2f} ({trade_record['pnl_pct']:+6.2f}%) | {exit_reason}")
                 
                 position = 0
         
@@ -527,14 +489,15 @@ def analyze_results(trades, equity_curve, final_capital, initial_capital, config
 def main():
     """主函数"""
     
-    # 应用预设配置
+    # 使用配置
     config = CONFIG.copy()
-    if ACTIVE_PRESET and ACTIVE_PRESET in PRESETS:
-        print(f"\n使用预设配置: {ACTIVE_PRESET}")
-        config.update(PRESETS[ACTIVE_PRESET])
     
-    # 加载数据
-    df = load_data(config['data_file'])
+    # 加载数据（带时间范围过滤）
+    df = load_data(
+        config['data_file'],
+        start_date=config.get('start_date'),
+        end_date=config.get('end_date')
+    )
     
     # 计算VWAP
     print("计算VWAP...")
