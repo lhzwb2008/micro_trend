@@ -26,27 +26,26 @@ warnings.filterwarnings('ignore')
 CONFIG = {
     # 数据设置
     'data_file': 'btc_15m.csv',    # 数据文件路径
-    'start_date': '2020-11-01',    # 回测起始日期（格式：YYYY-MM-DD，None表示从数据开始）
+    'start_date': '2024-11-01',    # 回测起始日期（格式：YYYY-MM-DD，None表示从数据开始）
     'end_date': '2025-11-09',      # 回测结束日期（格式：YYYY-MM-DD，None表示到数据结束）
     
     # VWAP计算周期（单位：K线数量，15分钟K线）
-    'vwap_period': 96,  # 96个15分钟 = 24小时
+    'vwap_period': 10,  # 96个15分钟 = 24小时
     
     # 偏离阈值设置（二选一）
     'use_fixed_deviation': True,   # True=使用固定百分比，False=使用标准差倍数
-    'entry_deviation_pct': 0.1,   # 固定偏离百分比（2024-2025稳定期建议：0.05-0.07）
-    'entry_std_multiplier': 2.0,   # 标准差倍数（仅use_fixed_deviation=False时生效）
+    'entry_deviation_pct': 0.02,   # 固定偏离百分比（2024-2025稳定期建议：0.05-0.07）
+    'entry_std_multiplier': 10,   # 标准差倍数（仅use_fixed_deviation=False时生效）
     
     # 止盈止损（优化后的最佳参数）
-    'take_profit_pct': 0.04,       # 止盈：4%
+    'take_profit_pct': 0.05,       # 止盈：4%
     'stop_loss_pct': 0.01,         # 止损：1%
     
     # 回归目标
-    'exit_on_vwap_touch': True,    # 价格回归到VWAP时平仓
-    'vwap_touch_threshold': 0.003, # VWAP触碰阈值（0.3%以内视为回归）
+    'exit_on_vwap_cross': True,    # 价格穿越VWAP时平仓（反向策略核心：多单价格上穿VWAP，空单价格下穿VWAP）
     
     # 时间控制
-    'max_hold_periods': 14,        # 最大持仓周期（14个15分钟 = 3.5小时）
+    'max_hold_periods': 30,        # 最大持仓周期（14个15分钟 = 3.5小时）
     'force_close_hour': 23,        # 强制平仓小时（UTC时间）
     'force_close_minute': 45,      # 强制平仓分钟
     
@@ -249,11 +248,14 @@ def run_backtest(df, config):
             elif pnl_pct <= -config['stop_loss_pct']:
                 exit_reason = 'stop_loss'
             
-            # 3. VWAP回归检查
-            elif config['exit_on_vwap_touch']:
-                vwap_distance_pct = abs(current_price - current_vwap) / current_vwap
-                if vwap_distance_pct <= config['vwap_touch_threshold']:
-                    exit_reason = 'vwap_touch'
+            # 3. VWAP穿越检查（价格从一侧穿越到另一侧）
+            elif config['exit_on_vwap_cross']:
+                # 多单：开仓时价格在VWAP下方，现在价格上穿到VWAP上方
+                if position == 1 and current_price >= current_vwap:
+                    exit_reason = 'vwap_cross'
+                # 空单：开仓时价格在VWAP上方，现在价格下穿到VWAP下方
+                elif position == -1 and current_price <= current_vwap:
+                    exit_reason = 'vwap_cross'
             
             # 4. 反向信号
             if exit_reason is None:
@@ -318,6 +320,7 @@ def run_backtest(df, config):
             entry_price = current_price * (1 + slippage_rate if position == 1 else 1 - slippage_rate)
             entry_time = current_time
             entry_idx = idx
+            entry_vwap = current_vwap  # 记录开仓时的VWAP
     
     # 回测结束时强制平仓
     if position != 0:
@@ -419,7 +422,7 @@ def analyze_results(trades, equity_curve, final_capital, initial_capital, config
         print(f"进场偏离: ±{config['entry_std_multiplier']:.1f}倍标准差")
     print(f"止盈/止损: {config['take_profit_pct']*100:.2f}% / {config['stop_loss_pct']*100:.2f}%")
     print(f"最大持仓: {config['max_hold_periods']}个周期")
-    print(f"VWAP回归: {'开启' if config['exit_on_vwap_touch'] else '关闭'}")
+    print(f"VWAP穿越平仓: {'开启' if config['exit_on_vwap_cross'] else '关闭'}")
     print(f"成交量确认: {'开启' if config['require_volume_confirm'] else '关闭'}")
     
     print("\n【整体表现】")
