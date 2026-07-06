@@ -1,4 +1,7 @@
-__*
-*.csv
-trading_plots
-*.png
+__pycache__/
+.venv/
+*.pyc
+
+# 数据与缓存（体积大，本地下载生成，不提交）
+data/*
+!data/.gitkeep
